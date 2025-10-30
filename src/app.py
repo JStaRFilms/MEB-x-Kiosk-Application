@@ -8,15 +8,26 @@ import pygame
 from pygame.locals import *
 import platform
 import os
+import json
+import threading
 
 from src.hardware.keypad import Keypad
 from src.states.splash import SplashState
 from src.states.dashboard import DashboardState
+from src.content_downloader import start_background_downloader
 
 
 def main():
     """Main application entry point."""
     pygame.init()
+
+    # Load configuration
+    config = {}
+    try:
+        with open(os.path.join('config', 'app_config.json'), 'r') as f:
+            config = json.load(f)
+    except Exception as e:
+        print(f"Error loading config: {e}")
 
     # Constants
     WIDTH = 1280
@@ -35,6 +46,11 @@ def main():
 
     # Initialize keypad
     keypad = Keypad()
+
+    # Start content downloader if configured
+    if 'content' in config and config['content'].get('enabled', False):
+        print("Starting background content downloader...")
+        start_background_downloader(config['content'])
 
     # Initialize states
     states = {

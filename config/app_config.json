@@ -1,1 +1,8 @@
-{}
+{
+  "content": {
+    "source_url": "https://api.content-provider.com/v1/list",
+    "check_interval_hours": 24,
+    "timeout_seconds": 60,
+    "enabled": true
+  }
+}

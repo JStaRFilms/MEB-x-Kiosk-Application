@@ -23,16 +23,16 @@ A standalone kiosk application for Raspberry Pi Zero 2 W providing access to edu
 4. Enable autostart: `sudo systemctl enable meb-x.service`
 5. Reboot the Raspberry Pi
 
-## Current Features (MUS - Minimum Usable State)
+## Current Features
 
 - **FR-001**: Autostart on boot - Application launches automatically on startup
 - **FR-002**: Splash screen - Displays EU logo for 3 seconds on startup
 - **FR-003**: Main dashboard - Shows "Books" and "Videos" options on dark gray background
 - **FR-004**: Keypad navigation - '1' highlights "Books", '2' highlights "Videos"
+- **FR-005**: Automatic content downloading - Background service downloads new books and videos when internet is available, comparing versions to avoid re-downloads
 
 ## Future Development
 
-- **FR-005**: Automatic content downloading when internet is available
 - **FR-006**: Content lists for books and videos
 - **FR-007**: Content player/viewer for selected books and videos
 
@@ -42,11 +42,12 @@ A standalone kiosk application for Raspberry Pi Zero 2 W providing access to edu
 /meb-x
 ├── src/
 │   ├── app.py              # Main application entry point
+│   ├── content_downloader.py # Background content downloader
 │   ├── states/             # State classes for the state machine
 │   ├── hardware/           # Hardware interfaces (keypad)
 │   └── ui/                 # UI system (components, renderer)
 ├── assets/                 # Images, fonts, and other media
-├── config/                 # Configuration files
+├── config/                 # Configuration files (includes content download settings)
 ├── content/                # Downloaded books and videos
 ├── docs/                   # Documentation
 ├── installer/              # Service files for installation
