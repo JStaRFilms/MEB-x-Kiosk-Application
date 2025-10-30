@@ -1,0 +1,13 @@
+[Unit]
+Description=MEB-x Kiosk Application
+After=multi-user.target
+
+[Service]
+User=oladiran
+WorkingDirectory=/home/oladiran/meb-x
+ExecStart=/usr/bin/python3 /home/oladiran/meb-x/src/app.py
+Restart=always
+Environment=DISPLAY=:0
+
+[Install]
+WantedBy=multi-user.target
