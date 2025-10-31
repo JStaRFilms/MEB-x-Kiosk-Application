@@ -54,6 +54,7 @@ The Minimum Usable State (MUS) for the MEB-x kiosk application has been fully im
 - **FR-003** ✅: Dashboard UI showing Books and Videos labels on dark background
 - **FR-004** ✅: Keypad navigation with '1' and '2' highlighting respective options
 - **FR-005** ✅: Automatic content downloading - Background service periodically downloads new books and videos, comparing MD5 hashes to avoid re-downloads
+- **FR-006** ✅: Content lists for books - Displays scrollable list of available books from `/content/books` directory with keypad navigation (up/down/select/back)
 
 ## Next Logical Steps for Development
 
@@ -63,7 +64,7 @@ The Minimum Usable State (MUS) for the MEB-x kiosk application has been fully im
 3. **Keypad Responsiveness**: Test matrix keypad scanning and debouncing in real hardware environment
 
 ### Feature Expansion Phase
-4. **Content State Implementation**: Create `BOOKS_MENU` and `VIDEOS_MENU` states with scrollable content lists (FR-006)
+4. **Content State Implementation**: Create `VIDEOS_MENU` state with scrollable video content lists
 5. **Content Viewer State** (FR-007): Build viewer components for books (PDF/text) and video playback, utilizing downloaded content
 7. **Enhanced UI Components**: Develop reusable components in `src/ui/components.py` for better consistency
 8. **Error Handling**: Add robust error handling for GPIO failures, file I/O, and network timeouts

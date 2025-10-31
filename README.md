@@ -30,10 +30,10 @@ A standalone kiosk application for Raspberry Pi Zero 2 W providing access to edu
 - **FR-003**: Main dashboard - Shows "Books" and "Videos" options on dark gray background
 - **FR-004**: Keypad navigation - '1' highlights "Books", '2' highlights "Videos"
 - **FR-005**: Automatic content downloading - Background service downloads new books and videos when internet is available, comparing versions to avoid re-downloads
+- **FR-006**: Content lists for books - Displays scrollable list of available books with keypad navigation
 
 ## Future Development
 
-- **FR-006**: Content lists for books and videos
 - **FR-007**: Content player/viewer for selected books and videos
 
 ## Project Structure

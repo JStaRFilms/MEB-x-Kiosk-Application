@@ -14,6 +14,7 @@ import threading
 from src.hardware.keypad import Keypad
 from src.states.splash import SplashState
 from src.states.dashboard import DashboardState
+from src.states.books_menu import BooksMenuState
 from src.content_downloader import start_background_downloader
 
 
@@ -55,7 +56,8 @@ def main():
     # Initialize states
     states = {
         'SPLASH': SplashState(),
-        'DASHBOARD': DashboardState()
+        'DASHBOARD': DashboardState(),
+        'BOOKS_MENU': BooksMenuState()
     }
 
     current_state = states['SPLASH']
