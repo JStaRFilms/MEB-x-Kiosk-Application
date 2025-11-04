@@ -1,22 +1,27 @@
 """
 MEB-x Books Menu State
 
-Displays a list of available books and handles selection.
+Displays a scrollable list of available books with proper UI components.
 """
 
 import os
 import pygame
 from src.states.base_state import BaseState
+from src.ui.renderer import UIRenderer
+from src.ui.components import Text, ListItem, Scrollbar
 
 
 class BooksMenuState(BaseState):
     """State for browsing and selecting books."""
 
-    def __init__(self):
+    def __init__(self, downloader=None):
         super().__init__()
-        self.font = pygame.font.Font(os.path.join('assets', 'fonts', 'default.ttf'), 30)
-        self.load_books()
+        self.renderer = UIRenderer()
+        self.renderer.load_fonts(os.path.join('assets', 'fonts', 'default.ttf'))
+
+        self.downloader = downloader
         self.selected_index = 0
+        self.scroll_offset = 0
 
         # Navigation key mappings
         self.NAV_UP = '8'
@@ -24,8 +29,59 @@ class BooksMenuState(BaseState):
         self.NAV_SELECT = '5'
         self.NAV_BACK = '*'
 
+        # UI layout constants
+        self.item_height = 60
+        self.visible_items = 8
+        self.list_padding = self.renderer.get_spacing('lg')
+
+        self.load_books()
+        self._init_ui()
+
+    def _init_ui(self):
+        """Initialize UI components."""
+        screen_width, screen_height = 1280, 720
+
+        # Title
+        self.title = Text(self.renderer, 0, self.renderer.get_spacing('xl'),
+                         "Available Books", '3xl', 'text_primary', 'center')
+        self.title.rect.centerx = screen_width // 2
+
+        # List container dimensions
+        list_width = 800
+        list_height = self.visible_items * self.item_height
+        list_x = (screen_width - list_width) // 2
+        list_y = self.title.rect.bottom + self.renderer.get_spacing('lg')
+
+        self.list_x = list_x
+        self.list_y = list_y
+        self.list_width = list_width
+        self.list_height = list_height
+
+        # Scrollbar
+        scrollbar_width = 12
+        scrollbar_x = list_x + list_width + self.renderer.get_spacing('md')
+        scrollbar_y = list_y
+        scrollbar_height = list_height
+
+        self.scrollbar = Scrollbar(self.renderer, scrollbar_x, scrollbar_y, scrollbar_width, scrollbar_height,
+                                  len(self.books), self.visible_items, self.scroll_offset)
+
+        # Instructions
+        self.instructions = Text(self.renderer, 0, screen_height - self.renderer.get_spacing('xl'),
+                                "↑↓ Navigate • 5 Select • * Back", 'sm', 'text_muted', 'center')
+        self.instructions.rect.centerx = screen_width // 2
+
+        # Status message for empty list
+        self.status_message = Text(self.renderer, 0, 0, "", 'lg', 'text_secondary', 'center')
+        self.status_message.rect.center = (screen_width // 2, screen_height // 2)
+
     def load_books(self):
         """Scan the books directory for available files."""
+        # Check for content updates when entering the menu
+        if self.downloader:
+            print("Books menu: Checking for content updates...")
+            self.downloader.check_for_updates()
+
         try:
             books_dir = os.path.join('content', 'books')
             if not os.path.exists(books_dir):
@@ -40,9 +96,20 @@ class BooksMenuState(BaseState):
                 f for f in all_files
                 if any(f.lower().endswith(ext) for ext in book_extensions)
             ]
+            # Sort alphabetically
+            self.books.sort()
         except Exception as e:
             print(f"Error loading books: {e}")
             self.books = []
+
+    def update_scroll(self):
+        """Update scroll position based on selected index."""
+        if self.selected_index < self.scroll_offset:
+            self.scroll_offset = self.selected_index
+        elif self.selected_index >= self.scroll_offset + self.visible_items:
+            self.scroll_offset = self.selected_index - self.visible_items + 1
+
+        self.scrollbar.update_scroll(self.scroll_offset, len(self.books), self.visible_items)
 
     def update(self, dt: float):
         pass  # No animation or timers needed
@@ -52,8 +119,10 @@ class BooksMenuState(BaseState):
             if event_type == 'key_press':
                 if key == self.NAV_UP and self.selected_index > 0:
                     self.selected_index -= 1
+                    self.update_scroll()
                 elif key == self.NAV_DOWN and self.selected_index < len(self.books) - 1:
                     self.selected_index += 1
+                    self.update_scroll()
                 elif key == self.NAV_SELECT and self.books:
                     selected_book = self.books[self.selected_index]
                     print(f"Selected book: {selected_book}")
@@ -63,38 +132,41 @@ class BooksMenuState(BaseState):
                     self.next_state = 'DASHBOARD'
 
     def render(self, screen, ui_font):
-        screen.fill((0, 0, 0))
-        width, height = screen.get_size()
+        # Clear screen with background
+        screen.fill(self.renderer.get_color('background'))
 
-        # Title
-        title = self.font.render("Available Books", True, (255, 255, 255))
-        screen.blit(title, (width // 2 - title.get_width() // 2, 50))
-
-        # Display books list
-        y_pos = 120
-        line_height = 40
+        # Render title
+        self.title.render(screen)
 
         if not self.books:
-            no_books = self.font.render("No books available", True, (128, 128, 128))
-            screen.blit(no_books, (width // 2 - no_books.get_width() // 2,
-                                   height // 2 - no_books.get_height() // 2))
+            # Show status message
+            self.status_message.set_text("No books available")
+            self.status_message.render(screen)
 
-            # Show downloading status message
-            downloading_msg = self.font.render("Content downloading in background...", True, (100, 100, 100))
-            screen.blit(downloading_msg, (width // 2 - downloading_msg.get_width() // 2,
-                                         height // 2 - downloading_msg.get_height() // 2 + 50))
+            # Show downloading status
+            downloading_msg = Text(self.renderer, 0, self.status_message.rect.bottom + self.renderer.get_spacing('md'),
+                                  "Content downloading in background...", 'base', 'text_muted', 'center')
+            downloading_msg.rect.centerx = 1280 // 2
+            downloading_msg.render(screen)
             return
 
-        # Calculate visible range (simple implementation, shows all for now)
-        for i, book in enumerate(self.books):
-            color = (255, 255, 255) if i == self.selected_index else (100, 100, 100)
+        # Render visible list items
+        start_idx = self.scroll_offset
+        end_idx = min(start_idx + self.visible_items, len(self.books))
 
-            # Truncate long filenames for display
-            display_name = book[:35] + '...' if len(book) > 35 else book
-            text = self.font.render(display_name, True, color)
-            screen.blit(text, (width // 2 - text.get_width() // 2, y_pos))
-            y_pos += line_height
+        for i in range(start_idx, end_idx):
+            item_idx = i - start_idx
+            item_y = self.list_y + (item_idx * self.item_height)
 
-            # Stop if running off screen
-            if y_pos > height - 100:
-                break
+            # Create list item component
+            is_selected = (i == self.selected_index)
+            item = ListItem(self.renderer, self.list_x, item_y, self.list_width, self.item_height,
+                           self.books[i][:50] + '...' if len(self.books[i]) > 50 else self.books[i],
+                           is_selected)
+            item.render(screen)
+
+        # Render scrollbar
+        self.scrollbar.render(screen)
+
+        # Render instructions
+        self.instructions.render(screen)

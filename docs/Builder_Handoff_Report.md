@@ -112,13 +112,31 @@ A comprehensive content downloading system has been implemented to automatically
 8. After processing all items, it logs "Content check finished."
 9. The background thread sleeps for the configured interval and repeats.
 
+### Menu-Triggered Updates
+
+In addition to the background periodic downloads, the system now checks for content updates **every time a user enters the Books or Videos menu**:
+
+- When navigating to the Books menu, it immediately checks the GitHub Gist for new books and downloads them
+- When navigating to the Videos menu, it immediately checks for new videos (including YouTube videos)
+- This ensures users always see the latest available content without waiting for the background timer
+- The menu-triggered checks use shorter timeouts and more concise logging to avoid blocking the UI
+
 ### Supported Content Sources
 
 - ✅ **Direct file downloads**: PDFs, videos, documents from any public URL
-- ✅ **YouTube videos**: Full YouTube video downloading with quality limits
+- ⚠️ **YouTube videos**: Supported but may encounter bot detection from YouTube. If downloads fail, consider using direct video URLs instead
 - ❌ **Google Drive**: Requires authentication (not supported)
 - ❌ **Google Photos**: Requires OAuth (not supported)
 - ❌ **Private/authenticated sites**: No login support
+
+### YouTube Download Troubleshooting
+
+If YouTube downloads fail with "Sign in to confirm you're not a bot" errors:
+
+1. **Use Direct Video URLs**: Instead of YouTube links, find and use direct video download URLs when possible
+2. **Rate Limiting**: The system includes delays between downloads to avoid detection
+3. **Alternative Sources**: Consider hosting videos on services that provide direct download links
+4. **Manual Download**: For problematic videos, download manually and add to the content directory
 
 ### Testing Instructions
 

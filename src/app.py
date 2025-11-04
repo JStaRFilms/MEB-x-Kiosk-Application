@@ -56,6 +56,7 @@ def main():
     keypad = Keypad()
 
     # Start content downloader if configured
+    downloader = None
     if 'content' in config and config['content'].get('enabled', False):
         print("Starting background content downloader...")
         downloader = ContentDownloader(config['content'])
@@ -72,8 +73,8 @@ def main():
     states = {
         'SPLASH': SplashState(),
         'DASHBOARD': DashboardState(),
-        'BOOKS_MENU': BooksMenuState(),
-        'VIDEOS_MENU': VideosMenuState()
+        'BOOKS_MENU': BooksMenuState(downloader),
+        'VIDEOS_MENU': VideosMenuState(downloader)
     }
 
     current_state = states['SPLASH']

@@ -40,6 +40,22 @@ class ContentDownloader:
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': False,
+                # Add options to avoid bot detection
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-us,en;q=0.5',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Referer': 'https://www.youtube.com/',
+                },
+                # Add sleep interval to avoid rate limiting
+                'sleep_interval': 1,
+                'max_sleep_interval': 5,
+                # Additional anti-bot measures
+                'cookiesfrombrowser': None,  # Don't use browser cookies
+                'ignoreerrors': True,
+                'no_check_certificate': False,
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -134,3 +150,83 @@ class ContentDownloader:
             print(f"Invalid JSON response: {e}")
         except Exception as e:
             print(f"Unexpected error in content downloader: {e}")
+
+    def check_for_updates(self):
+        """Quick check for content updates without full logging."""
+        try:
+            # Fetch data from source URL
+            response = requests.get(self.config['source_url'], timeout=5)
+            response.raise_for_status()
+
+            # Parse JSON array
+            content_items = response.json()
+            new_items_found = 0
+
+            # Process each item
+            for item in content_items:
+                name = item.get('name')
+                item_type = item.get('type')
+                url = item.get('url')
+
+                # Determine local directory
+                if item_type == 'book':
+                    local_dir = 'content/books/'
+                elif item_type == 'video':
+                    local_dir = 'content/videos/'
+                else:
+                    continue
+
+                # Ensure directory exists
+                os.makedirs(local_dir, exist_ok=True)
+
+                # Construct full local path
+                local_path = os.path.join(local_dir, name)
+
+                # Check if file already exists (handle YouTube extensions)
+                file_exists = False
+                if self._is_youtube_url(url):
+                    # For YouTube, check if any file with the base name exists
+                    base_name = os.path.splitext(name)[0]
+                    for ext in ['.mp4', '.webm', '.mkv', '.avi', '.mov']:
+                        if os.path.exists(os.path.join(local_dir, base_name + ext)):
+                            file_exists = True
+                            break
+                else:
+                    file_exists = os.path.exists(local_path)
+
+                if not file_exists:
+                    new_items_found += 1
+                    # Download immediately
+                    print(f"Menu-triggered download: '{name}'...")
+                    success = False
+
+                    if self._is_youtube_url(url):
+                        print(f"Detected YouTube URL, using yt-dlp for '{name}'...")
+                        base_path = os.path.splitext(local_path)[0]
+                        success = self._download_youtube_video(url, base_path)
+                    else:
+                        try:
+                            file_response = requests.get(url, timeout=10, stream=True)
+                            file_response.raise_for_status()
+
+                            with open(local_path, 'wb') as f:
+                                for chunk in file_response.iter_content(chunk_size=8192):
+                                    f.write(chunk)
+                            success = True
+
+                        except requests.RequestException as e:
+                            print(f"Error downloading '{name}': {e}")
+                            success = False
+
+                    if success:
+                        print(f"Successfully downloaded '{name}'")
+                    else:
+                        print(f"Failed to download '{name}'")
+
+            if new_items_found == 0:
+                print("Menu check: No new content available")
+            else:
+                print(f"Menu check: Downloaded {new_items_found} new items")
+
+        except Exception as e:
+            print(f"Menu update check failed: {e}")
