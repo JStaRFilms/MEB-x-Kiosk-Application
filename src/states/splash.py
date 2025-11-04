@@ -27,5 +27,5 @@ class SplashState(BaseState):
         pass
 
     def render(self, screen, font):
-        screen.fill((0, 0, 0))
+        screen.fill((255, 255, 255))
         screen.blit(self.logo, (1280 // 2 - 400 // 2, 720 // 2 - 400 // 2))
