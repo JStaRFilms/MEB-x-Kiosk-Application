@@ -2,3 +2,4 @@ pygame
 gpiozero
 RPi.GPIO
 requests
+yt-dlp

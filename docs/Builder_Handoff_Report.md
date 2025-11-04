@@ -82,15 +82,19 @@ The Minimum Usable State (MUS) for the MEB-x kiosk application has been fully im
 
 ## Content Downloader Implementation
 
-A new content downloading system has been implemented to automatically fetch books and videos from a remote source.
+A comprehensive content downloading system has been implemented to automatically fetch books and videos from remote sources, including YouTube videos.
 
 ### What Was Built
 
-- **New Service Module**: Created `src/services/downloader.py` containing the `ContentDownloader` class that handles all content downloading logic.
+- **Enhanced Service Module**: Created `src/services/downloader.py` containing the `ContentDownloader` class with support for both direct downloads and YouTube videos.
 
-- **Filename-Based Versioning**: Unlike the previous hash-based system, this implementation uses simple filename-based versioning - content is downloaded only if the file does not already exist locally. This eliminates the need for hash comparisons and simplifies the logic.
+- **YouTube Video Support**: Added yt-dlp integration to download YouTube videos automatically. The system detects YouTube URLs and uses specialized downloading logic for them.
+
+- **Filename-Based Versioning**: Uses simple filename-based versioning - content is downloaded only if the file does not already exist locally. For YouTube videos, it checks for any video file with the base name (handling different extensions like .mp4, .webm, etc.).
 
 - **Configuration Update**: Updated `config/app_config.json` to use the correct Gist URL: `https://gist.githubusercontent.com/JStaRFilms/7a81c8d792ab2e5a88801ad6dc999328/raw/content.json`.
+
+- **Dependencies**: Added `yt-dlp` to `requirements.txt` for YouTube downloading capabilities.
 
 - **Background Thread Integration**: Modified `src/app.py` to run the content downloader in a background daemon thread that periodically checks for new content based on the configured interval.
 
@@ -100,22 +104,35 @@ A new content downloading system has been implemented to automatically fetch boo
 2. For each item in the array, it extracts `name`, `type`, and `url` (ignoring any `hash` field).
 3. Based on `type` ("book" or "video"), it determines the local directory (`content/books/` or `content/videos/`).
 4. It creates the directory if it doesn't exist.
-5. If the file already exists locally, it skips the download with a log message.
-6. If the file doesn't exist, it downloads it using streaming to handle large files efficiently.
-7. After processing all items, it logs "Content check finished."
-8. The background thread sleeps for the configured interval and repeats.
+5. **URL Detection**: The system automatically detects if the URL is from YouTube (youtube.com, youtu.be, etc.).
+6. **Download Method Selection**:
+   - **YouTube URLs**: Uses yt-dlp with 720p quality limit for kiosk compatibility
+   - **Regular URLs**: Uses streaming HTTP downloads for direct file access
+7. **Existence Check**: For YouTube videos, checks if any file with the base name exists (handles yt-dlp's automatic extension adding).
+8. After processing all items, it logs "Content check finished."
+9. The background thread sleeps for the configured interval and repeats.
+
+### Supported Content Sources
+
+- ✅ **Direct file downloads**: PDFs, videos, documents from any public URL
+- ✅ **YouTube videos**: Full YouTube video downloading with quality limits
+- ❌ **Google Drive**: Requires authentication (not supported)
+- ❌ **Google Photos**: Requires OAuth (not supported)
+- ❌ **Private/authenticated sites**: No login support
 
 ### Testing Instructions
 
-To test the new content downloading functionality:
+To test the enhanced content downloading functionality:
 
 1. **Ensure Internet Connectivity**: Make sure the Raspberry Pi is connected to the internet.
 2. **Run the Application**: Start the MEB-x application.
 3. **Monitor Logs**: Check the application logs for messages like:
    - "Downloading new content item: 'filename'..."
+   - "Detected YouTube URL, using yt-dlp for 'filename'..."
    - "Content item 'filename' already exists. Skipping download."
    - "Content check finished."
 4. **Verify File Creation**: Check that new files appear in the `/content/books/` and `/content/videos/` directories.
-5. **Test Persistence**: Run the application again and verify that existing files are not re-downloaded (you should see "already exists" messages instead of download messages).
+5. **Test YouTube Downloads**: Include YouTube URLs in your content JSON to test video downloading.
+6. **Test Persistence**: Run the application again and verify that existing files are not re-downloaded.
 
 The MUS is complete and the application should display the splash screen followed by the dashboard with functional keypad navigation. All foundation is in place for expanding to the full feature set outlined in the requirements document.
