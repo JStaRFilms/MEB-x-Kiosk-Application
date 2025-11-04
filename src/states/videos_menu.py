@@ -7,6 +7,7 @@ Displays a scrollable list of available videos with proper UI components.
 import os
 import pygame
 from src.states.base_state import BaseState
+from src.states.viewer import ViewerState
 from src.ui.renderer import UIRenderer
 from src.ui.components import Text, ListItem, Scrollbar, DownloadProgress
 
@@ -164,8 +165,10 @@ class VideosMenuState(BaseState):
                     self.update_scroll()
                 elif key == self.NAV_SELECT and self.videos:
                     selected_video = self.videos[self.selected_index]
-                    print(f"Selected video: {selected_video}")
-                    # TODO: Future implementation - open video player
+                    video_path = os.path.join('content', 'videos', selected_video)
+                    ViewerState.set_pending_content('video', video_path, selected_video)
+                    self.should_transition = True
+                    self.next_state = 'VIEWER'
                 elif key == self.NAV_BACK:
                     self.should_transition = True
                     self.next_state = 'DASHBOARD'

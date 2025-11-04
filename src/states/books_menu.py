@@ -7,6 +7,7 @@ Displays a scrollable list of available books with proper UI components.
 import os
 import pygame
 from src.states.base_state import BaseState
+from src.states.viewer import ViewerState
 from src.ui.renderer import UIRenderer
 from src.ui.components import Text, ListItem, Scrollbar, DownloadProgress
 
@@ -164,8 +165,10 @@ class BooksMenuState(BaseState):
                     self.update_scroll()
                 elif key == self.NAV_SELECT and self.books:
                     selected_book = self.books[self.selected_index]
-                    print(f"Selected book: {selected_book}")
-                    # TODO: Future implementation - open book viewer
+                    book_path = os.path.join('content', 'books', selected_book)
+                    ViewerState.set_pending_content('book', book_path, selected_book)
+                    self.should_transition = True
+                    self.next_state = 'VIEWER'
                 elif key == self.NAV_BACK:
                     self.should_transition = True
                     self.next_state = 'DASHBOARD'

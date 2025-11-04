@@ -3,3 +3,4 @@ gpiozero
 RPi.GPIO
 requests
 yt-dlp
+PyMuPDF

@@ -20,6 +20,7 @@ from src.states.splash import SplashState
 from src.states.dashboard import DashboardState
 from src.states.books_menu import BooksMenuState
 from src.states.videos_menu import VideosMenuState
+from src.states.viewer import ViewerState
 from src.services.downloader import ContentDownloader
 
 
@@ -111,7 +112,14 @@ def main():
         # Check for state transition
         if current_state.should_transition:
             next_state_id = current_state.next_state
-            current_state = states[next_state_id]
+
+            # Handle dynamic VIEWER state creation
+            if next_state_id == 'VIEWER':
+                current_state = ViewerState()
+                states['VIEWER'] = current_state  # Cache it for future use
+            else:
+                current_state = states[next_state_id]
+
             current_state_id = next_state_id
             # Reset transition flag
             current_state.should_transition = False
