@@ -8,7 +8,7 @@ import os
 import pygame
 from src.states.base_state import BaseState
 from src.ui.renderer import UIRenderer
-from src.ui.components import Text, ListItem, Scrollbar
+from src.ui.components import Text, ListItem, Scrollbar, DownloadProgress
 
 
 class VideosMenuState(BaseState):
@@ -22,6 +22,7 @@ class VideosMenuState(BaseState):
         self.downloader = downloader
         self.selected_index = 0
         self.scroll_offset = 0
+        self.content_check_started = False
 
         # Navigation key mappings
         self.NAV_UP = '8'
@@ -34,7 +35,7 @@ class VideosMenuState(BaseState):
         self.visible_items = 8
         self.list_padding = self.renderer.get_spacing('lg')
 
-        self.load_videos()
+        self.load_videos()  # Load existing videos without downloading
         self._init_ui()
 
     def _init_ui(self):
@@ -75,13 +76,32 @@ class VideosMenuState(BaseState):
         self.status_message = Text(self.renderer, 0, 0, "", 'lg', 'text_secondary', 'center')
         self.status_message.rect.center = (screen_width // 2, screen_height // 2)
 
+        # Download progress indicator
+        progress_width = 400
+        progress_height = 60
+        progress_x = (screen_width - progress_width) // 2
+        progress_y = screen_height - self.renderer.get_spacing('3xl') - progress_height
+
+        self.download_progress = DownloadProgress(self.renderer, progress_x, progress_y,
+                                                progress_width, progress_height)
+        self.download_progress.visible = False  # Hidden by default
+
+        # Set up progress callback if downloader exists
+        if self.downloader:
+            self.downloader.progress_callback = self._on_download_progress
+
+    def _on_download_progress(self, filename: str, progress: float):
+        """Handle download progress updates."""
+        self.download_progress.update_progress(filename, progress)
+        self.download_progress.visible = True
+
+        # Hide progress when download completes
+        if progress >= 1.0:
+            # Keep it visible for a moment, then hide
+            pygame.time.set_timer(pygame.USEREVENT + 1, 2000)  # Hide after 2 seconds
+
     def load_videos(self):
         """Scan the videos directory for available files."""
-        # Check for content updates when entering the menu
-        if self.downloader:
-            print("Videos menu: Checking for content updates...")
-            self.downloader.check_for_updates()
-
         try:
             videos_dir = os.path.join('content', 'videos')
             if not os.path.exists(videos_dir):
@@ -102,6 +122,23 @@ class VideosMenuState(BaseState):
             print(f"Error loading videos: {e}")
             self.videos = []
 
+    def check_for_content_updates(self):
+        """Check for content updates asynchronously."""
+        if self.downloader and not self.content_check_started:
+            self.content_check_started = True
+            import threading
+            def update_check():
+                print("Videos menu: Checking for content updates...")
+                self.downloader.check_for_updates()
+                # Refresh the video list after updates
+                self.load_videos()
+                # Update scrollbar with new item count
+                if hasattr(self, 'scrollbar'):
+                    self.scrollbar.update_scroll(self.scroll_offset, len(self.videos), self.visible_items)
+
+            thread = threading.Thread(target=update_check, daemon=True)
+            thread.start()
+
     def update_scroll(self):
         """Update scroll position based on selected index."""
         if self.selected_index < self.scroll_offset:
@@ -112,7 +149,9 @@ class VideosMenuState(BaseState):
         self.scrollbar.update_scroll(self.scroll_offset, len(self.videos), self.visible_items)
 
     def update(self, dt: float):
-        pass  # No animation or timers needed
+        # Start content update check on first update (after UI is initialized)
+        if not self.content_check_started:
+            self.check_for_content_updates()
 
     def handle_events(self, events: list):
         for event_type, key in events:
@@ -170,3 +209,6 @@ class VideosMenuState(BaseState):
 
         # Render instructions
         self.instructions.render(screen)
+
+        # Render download progress if active
+        self.download_progress.render(screen)

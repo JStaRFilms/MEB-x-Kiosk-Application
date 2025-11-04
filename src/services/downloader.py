@@ -14,14 +14,17 @@ import yt_dlp
 class ContentDownloader:
     """Handles content downloading from remote source."""
 
-    def __init__(self, config):
+    def __init__(self, config, progress_callback=None):
         """
         Initialize the content downloader.
 
         Args:
             config (dict): Configuration dictionary from app_config.json
+            progress_callback (callable): Optional callback for progress updates
+                                         Signature: callback(filename, progress_float)
         """
         self.config = config
+        self.progress_callback = progress_callback
 
     def _is_youtube_url(self, url):
         """Check if URL is from YouTube or YouTube-like platforms."""
@@ -128,11 +131,27 @@ class ContentDownloader:
                         file_response = requests.get(url, timeout=10, stream=True)
                         file_response.raise_for_status()
 
-                        # Stream download to file
+                        # Get total file size for progress calculation
+                        total_size = int(file_response.headers.get('content-length', 0))
+                        downloaded_size = 0
+
+                        # Stream download to file with progress updates
                         with open(local_path, 'wb') as f:
                             for chunk in file_response.iter_content(chunk_size=8192):
-                                f.write(chunk)
+                                if chunk:
+                                    f.write(chunk)
+                                    downloaded_size += len(chunk)
+
+                                    # Report progress if callback is available
+                                    if self.progress_callback and total_size > 0:
+                                        progress = downloaded_size / total_size
+                                        self.progress_callback(name, min(progress, 1.0))
+
                         success = True
+
+                        # Final progress update
+                        if self.progress_callback:
+                            self.progress_callback(name, 1.0)
 
                     except requests.RequestException as e:
                         print(f"Error downloading '{name}': {e}")

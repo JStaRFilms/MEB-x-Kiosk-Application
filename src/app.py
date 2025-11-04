@@ -77,6 +77,9 @@ def main():
         'VIDEOS_MENU': VideosMenuState(downloader)
     }
 
+    # Set up progress callbacks for menu states (will be handled by individual states)
+    # The progress callback is set up in each menu state's __init__ method
+
     current_state = states['SPLASH']
     current_state_id = 'SPLASH'
 

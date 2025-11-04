@@ -241,27 +241,45 @@ class ProgressBar(UIComponent):
             self.renderer.draw_rect(screen, self.fill_color, fill_rect, self.border_radius)
 
 
-class Icon(UIComponent):
-    """Simple icon component using text symbols."""
+class DownloadProgress(UIComponent):
+    """Download progress indicator with filename and progress bar."""
 
-    def __init__(self, renderer, x: int, y: int, icon_char: str,
-                 font_size: str = '2xl', color: str = 'text_primary'):
-        # Calculate size based on icon
-        font = renderer.get_font(font_size)
-        text_surface = font.render(icon_char, True, (0, 0, 0))
-        width = text_surface.get_width()
-        height = text_surface.get_height()
-
+    def __init__(self, renderer, x: int, y: int, width: int, height: int,
+                 filename: str = "", progress: float = 0.0):
         super().__init__(renderer, x, y, width, height)
-        self.icon_char = icon_char
-        self.font_size = font_size
-        self.color = color
+        self.filename = filename
+        self.progress = progress
+        self.bar_height = 8
+        self.padding = renderer.get_spacing('sm')
+
+        # Create progress bar
+        bar_y = y + height - self.bar_height - self.padding
+        self.progress_bar = ProgressBar(renderer, x + self.padding, bar_y,
+                                       width - 2 * self.padding, self.bar_height,
+                                       progress, 'border', 'accent', 'sm')
+
+    def update_progress(self, filename: str, progress: float):
+        """Update download progress."""
+        self.filename = filename
+        self.progress = progress
+        self.progress_bar.set_progress(progress)
 
     def render(self, screen):
         if not self.visible:
             return
 
-        center_x = self.rect.centerx
-        center_y = self.rect.centery
-        self.renderer.draw_text(screen, self.icon_char, (center_x, center_y),
-                               self.font_size, self.color, 'center')
+        # Draw filename text
+        if self.filename:
+            display_name = self.filename[:40] + '...' if len(self.filename) > 40 else self.filename
+            text_rect = self.renderer.draw_text(screen, f"Downloading: {display_name}",
+                                               (self.rect.x + self.padding, self.rect.y + self.padding),
+                                               'sm', 'text_primary', 'left')
+
+        # Draw progress bar
+        self.progress_bar.render(screen)
+
+        # Draw progress percentage
+        percent_text = f"{int(self.progress * 100)}%"
+        self.renderer.draw_text(screen, percent_text,
+                               (self.rect.right - self.padding, self.rect.y + self.padding),
+                               'sm', 'text_secondary', 'right')
