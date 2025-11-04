@@ -160,10 +160,17 @@ def start_background_downloader(config):
     """
     downloader = ContentDownloader(config)
 
-    # Check immediately once
-    downloader.download_content()
+    # Start background thread that will check immediately, then periodically
+    def initial_check_and_loop():
+        """Perform initial check, then enter periodic loop."""
+        try:
+            downloader.download_content()  # Initial check
+        except Exception as e:
+            downloader._log(f"Error during initial content check: {e}")
 
-    # Then start background thread
-    thread = threading.Thread(target=downloader.background_loop, daemon=True)
+        # Then enter the periodic loop
+        downloader.background_loop()
+
+    thread = threading.Thread(target=initial_check_and_loop, daemon=True)
     thread.start()
     print("Background content downloader started")

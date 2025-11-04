@@ -1,7 +1,7 @@
 """
-MEB-x Books Menu State
+MEB-x Videos Menu State
 
-Displays a list of available books and handles selection.
+Displays a list of available videos and handles selection.
 """
 
 import os
@@ -9,13 +9,13 @@ import pygame
 from src.states.base_state import BaseState
 
 
-class BooksMenuState(BaseState):
-    """State for browsing and selecting books."""
+class VideosMenuState(BaseState):
+    """State for browsing and selecting videos."""
 
     def __init__(self):
         super().__init__()
         self.font = pygame.font.Font(os.path.join('assets', 'fonts', 'default.ttf'), 30)
-        self.load_books()
+        self.load_videos()
         self.selected_index = 0
 
         # Navigation key mappings
@@ -24,25 +24,25 @@ class BooksMenuState(BaseState):
         self.NAV_SELECT = '5'
         self.NAV_BACK = '*'
 
-    def load_books(self):
-        """Scan the books directory for available files."""
+    def load_videos(self):
+        """Scan the videos directory for available files."""
         try:
-            books_dir = os.path.join('content', 'books')
-            if not os.path.exists(books_dir):
-                os.makedirs(books_dir)
-                self.books = []
+            videos_dir = os.path.join('content', 'videos')
+            if not os.path.exists(videos_dir):
+                os.makedirs(videos_dir)
+                self.videos = []
                 return
 
-            # Get all files, filter for common book formats
-            all_files = os.listdir(books_dir)
-            book_extensions = ['.txt', '.pdf', '.epub', '.docx']
-            self.books = [
+            # Get all files, filter for common video formats
+            all_files = os.listdir(videos_dir)
+            video_extensions = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']
+            self.videos = [
                 f for f in all_files
-                if any(f.lower().endswith(ext) for ext in book_extensions)
+                if any(f.lower().endswith(ext) for ext in video_extensions)
             ]
         except Exception as e:
-            print(f"Error loading books: {e}")
-            self.books = []
+            print(f"Error loading videos: {e}")
+            self.videos = []
 
     def update(self, dt: float):
         pass  # No animation or timers needed
@@ -52,12 +52,12 @@ class BooksMenuState(BaseState):
             if event_type == 'key_press':
                 if key == self.NAV_UP and self.selected_index > 0:
                     self.selected_index -= 1
-                elif key == self.NAV_DOWN and self.selected_index < len(self.books) - 1:
+                elif key == self.NAV_DOWN and self.selected_index < len(self.videos) - 1:
                     self.selected_index += 1
-                elif key == self.NAV_SELECT and self.books:
-                    selected_book = self.books[self.selected_index]
-                    print(f"Selected book: {selected_book}")
-                    # TODO: Future implementation - open book viewer
+                elif key == self.NAV_SELECT and self.videos:
+                    selected_video = self.videos[self.selected_index]
+                    print(f"Selected video: {selected_video}")
+                    # TODO: Future implementation - open video player
                 elif key == self.NAV_BACK:
                     self.should_transition = True
                     self.next_state = 'DASHBOARD'
@@ -67,17 +67,17 @@ class BooksMenuState(BaseState):
         width, height = screen.get_size()
 
         # Title
-        title = self.font.render("Available Books", True, (255, 255, 255))
+        title = self.font.render("Available Videos", True, (255, 255, 255))
         screen.blit(title, (width // 2 - title.get_width() // 2, 50))
 
-        # Display books list
+        # Display videos list
         y_pos = 120
         line_height = 40
 
-        if not self.books:
-            no_books = self.font.render("No books available", True, (128, 128, 128))
-            screen.blit(no_books, (width // 2 - no_books.get_width() // 2,
-                                   height // 2 - no_books.get_height() // 2))
+        if not self.videos:
+            no_videos = self.font.render("No videos available", True, (128, 128, 128))
+            screen.blit(no_videos, (width // 2 - no_videos.get_width() // 2,
+                                    height // 2 - no_videos.get_height() // 2))
 
             # Show downloading status message
             downloading_msg = self.font.render("Content downloading in background...", True, (100, 100, 100))
@@ -86,11 +86,11 @@ class BooksMenuState(BaseState):
             return
 
         # Calculate visible range (simple implementation, shows all for now)
-        for i, book in enumerate(self.books):
+        for i, video in enumerate(self.videos):
             color = (255, 255, 255) if i == self.selected_index else (100, 100, 100)
 
             # Truncate long filenames for display
-            display_name = book[:35] + '...' if len(book) > 35 else book
+            display_name = video[:35] + '...' if len(video) > 35 else video
             text = self.font.render(display_name, True, color)
             screen.blit(text, (width // 2 - text.get_width() // 2, y_pos))
             y_pos += line_height

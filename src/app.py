@@ -4,10 +4,13 @@ MEB-x Main Application
 State-machine driven kiosk application for Raspberry Pi.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import pygame
 from pygame.locals import *
 import platform
-import os
 import json
 import threading
 
@@ -15,11 +18,14 @@ from src.hardware.keypad import Keypad
 from src.states.splash import SplashState
 from src.states.dashboard import DashboardState
 from src.states.books_menu import BooksMenuState
+from src.states.videos_menu import VideosMenuState
 from src.content_downloader import start_background_downloader
 
 
 def main():
     """Main application entry point."""
+    # Set working directory to project root
+    os.chdir(os.path.join(os.path.dirname(__file__), '..'))
     pygame.init()
 
     # Load configuration
@@ -57,7 +63,8 @@ def main():
     states = {
         'SPLASH': SplashState(),
         'DASHBOARD': DashboardState(),
-        'BOOKS_MENU': BooksMenuState()
+        'BOOKS_MENU': BooksMenuState(),
+        'VIDEOS_MENU': VideosMenuState()
     }
 
     current_state = states['SPLASH']
@@ -70,13 +77,16 @@ def main():
     while running:
         dt = clock.tick(60) / 1000.0  # 60 FPS
 
-        # Handle pygame events
-        for event in pygame.event.get():
+        # Get all pygame events
+        pygame_events = pygame.event.get()
+
+        # Handle pygame events for system (QUIT, etc.)
+        for event in pygame_events:
             if event.type == pygame.QUIT:
                 running = False
 
-        # Poll keypad for key presses
-        key = keypad.get_key()
+        # Poll keypad for key presses (pass events to keypad)
+        key = keypad.get_key(pygame_events)
         events = []
         if key:
             events.append(('key_press', key))

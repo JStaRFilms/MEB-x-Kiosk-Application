@@ -24,7 +24,9 @@ class DashboardState(BaseState):
                 if key == '1':
                     self.should_transition = True
                     self.next_state = 'BOOKS_MENU'
-                # Future: key '2' for videos menu
+                elif key == '2':
+                    self.should_transition = True
+                    self.next_state = 'VIDEOS_MENU'
 
     def render(self, screen, font):
         screen.blit(self.bg, (0, 0))
