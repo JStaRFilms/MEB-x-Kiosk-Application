@@ -10,6 +10,7 @@ from src.states.base_state import BaseState
 from src.states.viewer import ViewerState
 from src.ui.renderer import UIRenderer
 from src.ui.components import Text, ListItem, Scrollbar, DownloadProgress
+from src.services.deleted_content_tracker import DeletedContentTracker
 
 
 class BooksMenuState(BaseState):
@@ -102,26 +103,40 @@ class BooksMenuState(BaseState):
             pygame.time.set_timer(pygame.USEREVENT + 1, 2000)  # Hide after 2 seconds
 
     def load_books(self):
-        """Scan the books directory for available files."""
+        """Scan the books directory for available files and include deleted books for redownload."""
         try:
             books_dir = os.path.join('content', 'books')
             if not os.path.exists(books_dir):
                 os.makedirs(books_dir)
-                self.books = []
-                return
 
             # Get all files, filter for common book formats
             all_files = os.listdir(books_dir)
             book_extensions = ['.txt', '.pdf', '.epub', '.docx']
-            self.books = [
+            available_books = [
                 f for f in all_files
                 if any(f.lower().endswith(ext) for ext in book_extensions)
             ]
+
+            # Get deleted books that can be redownloaded
+            tracker = DeletedContentTracker()
+            deleted_books = tracker.get_deleted_files('book')
+
+            # Combine available and deleted books
+            # Available books come first, then deleted books with [DELETED] prefix
+            self.books = available_books.copy()
+            self.deleted_books = []  # Track which books are deleted for redownload
+
+            for deleted_book in deleted_books:
+                if deleted_book not in available_books:  # Don't show if already available
+                    self.books.append(f"[DELETED] {deleted_book}")
+                    self.deleted_books.append(deleted_book)
+
             # Sort alphabetically
             self.books.sort()
         except Exception as e:
             print(f"Error loading books: {e}")
             self.books = []
+            self.deleted_books = []
 
     def check_for_content_updates(self):
         """Check for content updates asynchronously."""
@@ -165,10 +180,30 @@ class BooksMenuState(BaseState):
                     self.update_scroll()
                 elif key == self.NAV_SELECT and self.books:
                     selected_book = self.books[self.selected_index]
-                    book_path = os.path.join('content', 'books', selected_book)
-                    ViewerState.set_pending_content('book', book_path, selected_book)
-                    self.should_transition = True
-                    self.next_state = 'VIEWER'
+
+                    # Check if this is a deleted book that needs redownloading
+                    if selected_book.startswith("[DELETED] "):
+                        actual_filename = selected_book[10:]  # Remove "[DELETED] " prefix
+                        if self.downloader:
+                            print(f"Redownloading deleted book: {actual_filename}")
+                            success = self.downloader.redownload_deleted_content('book', actual_filename, self._on_download_progress)
+                            if success:
+                                # Refresh the book list to show the redownloaded book
+                                self.load_books()
+                                # Update scrollbar
+                                if hasattr(self, 'scrollbar'):
+                                    self.scrollbar.update_scroll(self.scroll_offset, len(self.books), self.visible_items)
+                                print(f"Successfully redownloaded: {actual_filename}")
+                            else:
+                                print(f"Failed to redownload: {actual_filename}")
+                        else:
+                            print("No downloader available for redownload")
+                    else:
+                        # Normal book selection
+                        book_path = os.path.join('content', 'books', selected_book)
+                        ViewerState.set_pending_content('book', book_path, selected_book)
+                        self.should_transition = True
+                        self.next_state = 'VIEWER'
                 elif key == self.NAV_BACK:
                     self.should_transition = True
                     self.next_state = 'DASHBOARD'

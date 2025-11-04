@@ -10,6 +10,7 @@ from src.states.base_state import BaseState
 from src.states.viewer import ViewerState
 from src.ui.renderer import UIRenderer
 from src.ui.components import Text, ListItem, Scrollbar, DownloadProgress
+from src.services.deleted_content_tracker import DeletedContentTracker
 
 
 class VideosMenuState(BaseState):
@@ -102,26 +103,40 @@ class VideosMenuState(BaseState):
             pygame.time.set_timer(pygame.USEREVENT + 1, 2000)  # Hide after 2 seconds
 
     def load_videos(self):
-        """Scan the videos directory for available files."""
+        """Scan the videos directory for available files and include deleted videos for redownload."""
         try:
             videos_dir = os.path.join('content', 'videos')
             if not os.path.exists(videos_dir):
                 os.makedirs(videos_dir)
-                self.videos = []
-                return
 
             # Get all files, filter for common video formats
             all_files = os.listdir(videos_dir)
             video_extensions = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']
-            self.videos = [
+            available_videos = [
                 f for f in all_files
                 if any(f.lower().endswith(ext) for ext in video_extensions)
             ]
+
+            # Get deleted videos that can be redownloaded
+            tracker = DeletedContentTracker()
+            deleted_videos = tracker.get_deleted_files('video')
+
+            # Combine available and deleted videos
+            # Available videos come first, then deleted videos with [DELETED] prefix
+            self.videos = available_videos.copy()
+            self.deleted_videos = []  # Track which videos are deleted for redownload
+
+            for deleted_video in deleted_videos:
+                if deleted_video not in available_videos:  # Don't show if already available
+                    self.videos.append(f"[DELETED] {deleted_video}")
+                    self.deleted_videos.append(deleted_video)
+
             # Sort alphabetically
             self.videos.sort()
         except Exception as e:
             print(f"Error loading videos: {e}")
             self.videos = []
+            self.deleted_videos = []
 
     def check_for_content_updates(self):
         """Check for content updates asynchronously."""
@@ -165,10 +180,30 @@ class VideosMenuState(BaseState):
                     self.update_scroll()
                 elif key == self.NAV_SELECT and self.videos:
                     selected_video = self.videos[self.selected_index]
-                    video_path = os.path.join('content', 'videos', selected_video)
-                    ViewerState.set_pending_content('video', video_path, selected_video)
-                    self.should_transition = True
-                    self.next_state = 'VIEWER'
+
+                    # Check if this is a deleted video that needs redownloading
+                    if selected_video.startswith("[DELETED] "):
+                        actual_filename = selected_video[10:]  # Remove "[DELETED] " prefix
+                        if self.downloader:
+                            print(f"Redownloading deleted video: {actual_filename}")
+                            success = self.downloader.redownload_deleted_content('video', actual_filename, self._on_download_progress)
+                            if success:
+                                # Refresh the video list to show the redownloaded video
+                                self.load_videos()
+                                # Update scrollbar
+                                if hasattr(self, 'scrollbar'):
+                                    self.scrollbar.update_scroll(self.scroll_offset, len(self.videos), self.visible_items)
+                                print(f"Successfully redownloaded: {actual_filename}")
+                            else:
+                                print(f"Failed to redownload: {actual_filename}")
+                        else:
+                            print("No downloader available for redownload")
+                    else:
+                        # Normal video selection
+                        video_path = os.path.join('content', 'videos', selected_video)
+                        ViewerState.set_pending_content('video', video_path, selected_video)
+                        self.should_transition = True
+                        self.next_state = 'VIEWER'
                 elif key == self.NAV_BACK:
                     self.should_transition = True
                     self.next_state = 'DASHBOARD'

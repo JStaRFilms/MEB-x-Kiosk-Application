@@ -11,6 +11,7 @@ import pygame
 from src.states.base_state import BaseState
 from src.ui.renderer import UIRenderer
 from src.ui.components import Text
+from src.services.deleted_content_tracker import DeletedContentTracker
 
 try:
     import fitz  # PyMuPDF
@@ -53,6 +54,7 @@ class ViewerState(BaseState):
 
         # Navigation keys
         self.NAV_EXIT = '*'
+        self.NAV_DELETE = '#'  # Delete key
         self.NAV_PREV_PAGE = '4'  # Left arrow on keypad
         self.NAV_NEXT_PAGE = '6'  # Right arrow on keypad
         self.NAV_SCROLL_UP = '8'   # Up arrow
@@ -75,6 +77,7 @@ class ViewerState(BaseState):
         # UI state
         self.loading = True
         self.error_message = None
+        self.content_deleted = False  # Flag to track if content was deleted
 
         self._init_ui()
         self._load_content()
@@ -98,12 +101,12 @@ class ViewerState(BaseState):
 
         # Book navigation instructions
         self.book_instructions = Text(self.renderer, 0, screen_height - self.renderer.get_spacing('xl'),
-                                     "4/6 Prev/Next Page • 8/2 Scroll • * Exit", 'sm', 'text_muted', 'center')
+                                     "4/6 Prev/Next Page • 8/2 Scroll • # Delete • * Exit", 'sm', 'text_muted', 'center')
         self.book_instructions.rect.centerx = screen_width // 2
 
         # Video instructions
         self.video_instructions = Text(self.renderer, 0, screen_height - self.renderer.get_spacing('xl'),
-                                      "Video playing... Press * to exit", 'sm', 'text_muted', 'center')
+                                      "Video playing... Press # to delete • * to exit", 'sm', 'text_muted', 'center')
         self.video_instructions.rect.centerx = screen_width // 2
 
     def _load_content(self):
@@ -301,6 +304,10 @@ class ViewerState(BaseState):
                         self.next_state = 'VIDEOS_MENU'
                     self.should_transition = True
 
+                elif key == self.NAV_DELETE and not self.loading:
+                    # Delete the current content
+                    self._delete_current_content()
+
                 elif self.content_type == 'book' and not self.loading and not self.error_message:
                     # Book navigation
                     if key == self.NAV_NEXT_PAGE and self.current_page < self.total_pages - 1:
@@ -324,6 +331,10 @@ class ViewerState(BaseState):
         if self.error_message:
             self.error_text.set_text(self.error_message)
             self.error_text.render(screen)
+            return
+
+        # Don't render content if it has been deleted
+        if self.content_deleted:
             return
 
         if self.content_type == 'book':
@@ -417,6 +428,123 @@ class ViewerState(BaseState):
 
             line_surface = font.render(lines[i], True, self.renderer.get_color('text_primary'))
             screen.blit(line_surface, (content_x, line_y))
+
+    def _delete_current_content(self):
+        """Delete the currently viewed content file and mark as deleted."""
+        try:
+            # Set flag immediately to prevent further rendering
+            self.content_deleted = True
+
+            # Clean up resources before deleting
+            self._cleanup_resources()
+
+            # Small delay to ensure resources are fully released
+            import time
+            time.sleep(1.0)  # Even longer delay
+
+            # Try Windows-specific forceful deletion
+            success = False
+            if os.path.exists(self.content_path):
+                try:
+                    # Try normal deletion first
+                    os.remove(self.content_path)
+                    success = True
+                    print(f"Deleted file: {self.content_path}")
+                except OSError:
+                    # If normal deletion fails, try Windows-specific approach
+                    try:
+                        import ctypes
+                        # Use Windows API to force deletion
+                        ctypes.windll.kernel32.DeleteFileW(self.content_path)
+                        success = True
+                        print(f"Force deleted file: {self.content_path}")
+                    except:
+                        # If that fails, mark for deletion on next startup
+                        print(f"Could not delete {self.content_path}, marking for later deletion")
+                        # Create a marker file to delete this file on next startup
+                        marker_file = self.content_path + ".delete_marker"
+                        try:
+                            with open(marker_file, 'w') as f:
+                                f.write("delete_me")
+                            print(f"Created deletion marker for {self.content_path}")
+                        except:
+                            pass
+
+            # Mark as deleted in tracker regardless of file deletion success
+            tracker = DeletedContentTracker()
+            tracker_type = 'book' if self.content_type == 'book' else 'video'
+            tracker.mark_as_deleted(tracker_type, self.content_name)
+
+            # Show confirmation and return to menu
+            if success:
+                self.error_message = f"'{self.content_name}' has been deleted.\n\nYou can redownload it later from the menu."
+            else:
+                self.error_message = f"'{self.content_name}' marked for deletion.\n\nFile will be removed on next startup.\nYou can redownload it later from the menu."
+            print(f"Content '{self.content_name}' marked as deleted")
+
+            # Transition back to menu immediately
+            if self.content_type == 'book':
+                self.next_state = 'BOOKS_MENU'
+            else:
+                self.next_state = 'VIDEOS_MENU'
+            self.should_transition = True
+
+        except Exception as e:
+            self.error_message = f"Error deleting content: {str(e)}"
+            print(f"Error deleting content: {e}")
+
+    def _cleanup_resources(self):
+        """Clean up all resources that might be holding the file open."""
+        try:
+            # Clean up PDF document first
+            if self.pdf_document:
+                self.pdf_document.close()
+                self.pdf_document = None
+                print("Closed PDF document")
+
+            # Clear PDF page cache and delete surfaces
+            for surface in self.pdf_page_images.values():
+                if surface:
+                    del surface
+            self.pdf_page_images.clear()
+
+            # Force garbage collection to release any remaining references
+            import gc
+            gc.collect()
+
+            # Clean up video process if running
+            if self.video_process:
+                try:
+                    self.video_process.terminate()
+                    self.video_process.wait(timeout=2)
+                    print("Terminated video process")
+                except:
+                    try:
+                        self.video_process.kill()
+                        print("Killed video process")
+                    except:
+                        pass
+                self.video_process = None
+
+            # Clean up video thread
+            if self.video_thread and self.video_thread.is_alive():
+                # Wait a bit for thread to finish
+                self.video_thread.join(timeout=1.0)
+                print("Video thread cleaned up")
+
+            # Clear text content
+            self.text_content = []
+            self.text_lines = []
+
+            # Additional delay and garbage collection
+            import time
+            time.sleep(0.2)
+            gc.collect()
+
+            print("All resources cleaned up")
+
+        except Exception as e:
+            print(f"Error during resource cleanup: {e}")
 
     def _render_video_status(self, screen):
         """Render video playing status."""

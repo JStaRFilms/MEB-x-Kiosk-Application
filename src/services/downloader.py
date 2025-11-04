@@ -9,6 +9,7 @@ import os
 import json
 import requests
 import yt_dlp
+from .deleted_content_tracker import DeletedContentTracker
 
 
 class ContentDownloader:
@@ -25,6 +26,7 @@ class ContentDownloader:
         """
         self.config = config
         self.progress_callback = progress_callback
+        self.deleted_tracker = DeletedContentTracker()
 
     def _is_youtube_url(self, url):
         """Check if URL is from YouTube or YouTube-like platforms."""
@@ -84,13 +86,20 @@ class ContentDownloader:
                 item_type = item.get('type')
                 url = item.get('url')
 
-                # Determine local directory
+                # Determine local directory and content type for tracker
                 if item_type == 'book':
                     local_dir = 'content/books/'
+                    tracker_type = 'book'
                 elif item_type == 'video':
                     local_dir = 'content/videos/'
+                    tracker_type = 'video'
                 else:
                     print(f"Warning: Unknown content type '{item_type}' for item '{name}'. Skipping.")
+                    continue
+
+                # Check if this file was previously deleted by user
+                if self.deleted_tracker.should_skip_download(tracker_type, name):
+                    print(f"Content item '{name}' was previously deleted by user. Skipping download.")
                     continue
 
                 # Ensure directory exists
@@ -249,3 +258,95 @@ class ContentDownloader:
 
         except Exception as e:
             print(f"Menu update check failed: {e}")
+
+    def redownload_deleted_content(self, content_type: str, filename: str, progress_callback=None) -> bool:
+        """
+        Manually redownload a previously deleted file.
+
+        Args:
+            content_type: 'book' or 'video'
+            filename: Name of the file to redownload
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            True if redownload was successful
+        """
+        try:
+            # Fetch current content list to find the file
+            response = requests.get(self.config['source_url'], timeout=10)
+            response.raise_for_status()
+
+            content_items = response.json()
+
+            # Find the matching item
+            target_item = None
+            for item in content_items:
+                if item.get('name') == filename and item.get('type') == content_type:
+                    target_item = item
+                    break
+
+            if not target_item:
+                print(f"File '{filename}' not found in remote content list")
+                return False
+
+            # Determine local directory
+            if content_type == 'book':
+                local_dir = 'content/books/'
+            elif content_type == 'video':
+                local_dir = 'content/videos/'
+            else:
+                print(f"Unknown content type: {content_type}")
+                return False
+
+            # Ensure directory exists
+            os.makedirs(local_dir, exist_ok=True)
+
+            url = target_item.get('url')
+            local_path = os.path.join(local_dir, filename)
+
+            print(f"Redownloading '{filename}'...")
+            success = False
+
+            if self._is_youtube_url(url):
+                print(f"Detected YouTube URL, using yt-dlp for '{filename}'...")
+                base_path = os.path.splitext(local_path)[0]
+                success = self._download_youtube_video(url, base_path)
+            else:
+                try:
+                    file_response = requests.get(url, timeout=10, stream=True)
+                    file_response.raise_for_status()
+
+                    total_size = int(file_response.headers.get('content-length', 0))
+                    downloaded_size = 0
+
+                    with open(local_path, 'wb') as f:
+                        for chunk in file_response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                downloaded_size += len(chunk)
+
+                                if progress_callback and total_size > 0:
+                                    progress = downloaded_size / total_size
+                                    progress_callback(filename, min(progress, 1.0))
+
+                    success = True
+
+                    if progress_callback:
+                        progress_callback(filename, 1.0)
+
+                except requests.RequestException as e:
+                    print(f"Error redownloading '{filename}': {e}")
+                    success = False
+
+            if success:
+                # Remove from deleted list since it's now restored
+                self.deleted_tracker.mark_as_restored(content_type, filename)
+                print(f"Successfully redownloaded '{filename}'")
+                return True
+            else:
+                print(f"Failed to redownload '{filename}'")
+                return False
+
+        except Exception as e:
+            print(f"Error in redownload: {e}")
+            return False
