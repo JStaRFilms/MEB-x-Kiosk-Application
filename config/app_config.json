@@ -1,6 +1,6 @@
 {
   "content": {
-    "source_url": "https://api.content-provider.com/v1/list",
+    "source_url": "https://gist.githubusercontent.com/JStaRFilms/7a81c8d792ab2e5a88801ad6dc999328/raw/content.json",
     "check_interval_hours": 24,
     "timeout_seconds": 60,
     "enabled": true

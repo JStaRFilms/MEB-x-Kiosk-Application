@@ -13,13 +13,14 @@ from pygame.locals import *
 import platform
 import json
 import threading
+import time
 
 from src.hardware.keypad import Keypad
 from src.states.splash import SplashState
 from src.states.dashboard import DashboardState
 from src.states.books_menu import BooksMenuState
 from src.states.videos_menu import VideosMenuState
-from src.content_downloader import start_background_downloader
+from src.services.downloader import ContentDownloader
 
 
 def main():
@@ -57,7 +58,15 @@ def main():
     # Start content downloader if configured
     if 'content' in config and config['content'].get('enabled', False):
         print("Starting background content downloader...")
-        start_background_downloader(config['content'])
+        downloader = ContentDownloader(config['content'])
+
+        def run_downloader_periodically():
+            while True:
+                downloader.check_and_download_content()
+                time.sleep(config['content']['check_interval_hours'] * 3600)
+
+        downloader_thread = threading.Thread(target=run_downloader_periodically, daemon=True)
+        downloader_thread.start()
 
     # Initialize states
     states = {

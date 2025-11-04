@@ -80,4 +80,42 @@ The Minimum Usable State (MUS) for the MEB-x kiosk application has been fully im
 14. **Documentation Updates**: Keep docs synchronized as features are added
 15. **Code Review**: Apply coding guidelines (type hints, error handling, PEP 8) to new features
 
+## Content Downloader Implementation
+
+A new content downloading system has been implemented to automatically fetch books and videos from a remote source.
+
+### What Was Built
+
+- **New Service Module**: Created `src/services/downloader.py` containing the `ContentDownloader` class that handles all content downloading logic.
+
+- **Filename-Based Versioning**: Unlike the previous hash-based system, this implementation uses simple filename-based versioning - content is downloaded only if the file does not already exist locally. This eliminates the need for hash comparisons and simplifies the logic.
+
+- **Configuration Update**: Updated `config/app_config.json` to use the correct Gist URL: `https://gist.githubusercontent.com/JStaRFilms/7a81c8d792ab2e5a88801ad6dc999328/raw/content.json`.
+
+- **Background Thread Integration**: Modified `src/app.py` to run the content downloader in a background daemon thread that periodically checks for new content based on the configured interval.
+
+### How It Works
+
+1. The downloader fetches a JSON array from the configured `source_url`.
+2. For each item in the array, it extracts `name`, `type`, and `url` (ignoring any `hash` field).
+3. Based on `type` ("book" or "video"), it determines the local directory (`content/books/` or `content/videos/`).
+4. It creates the directory if it doesn't exist.
+5. If the file already exists locally, it skips the download with a log message.
+6. If the file doesn't exist, it downloads it using streaming to handle large files efficiently.
+7. After processing all items, it logs "Content check finished."
+8. The background thread sleeps for the configured interval and repeats.
+
+### Testing Instructions
+
+To test the new content downloading functionality:
+
+1. **Ensure Internet Connectivity**: Make sure the Raspberry Pi is connected to the internet.
+2. **Run the Application**: Start the MEB-x application.
+3. **Monitor Logs**: Check the application logs for messages like:
+   - "Downloading new content item: 'filename'..."
+   - "Content item 'filename' already exists. Skipping download."
+   - "Content check finished."
+4. **Verify File Creation**: Check that new files appear in the `/content/books/` and `/content/videos/` directories.
+5. **Test Persistence**: Run the application again and verify that existing files are not re-downloaded (you should see "already exists" messages instead of download messages).
+
 The MUS is complete and the application should display the splash screen followed by the dashboard with functional keypad navigation. All foundation is in place for expanding to the full feature set outlined in the requirements document.
